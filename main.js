@@ -1,10 +1,10 @@
-// 전역 변수 선언
-let chatArea;
-let userInput;
-let sendBtn;
-let currentQuiz = null;
-let quizScore = 0;
-let totalQuestions = 0;
+// 환경 변수에서 API 키 가져오기 (필요시 사용)
+//const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+
+// DOM 요소 가져오기
+const chatArea = document.getElementById('chatArea');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.querySelector('.send-btn');
 
 // 함수 관련 영어 단어 데이터
 const vocabularyData = {
@@ -134,113 +134,40 @@ const vocabularyData = {
     ]
 };
 
-// 초기화 함수
-function initializeChatbot() {
-    console.log('챗봇 초기화 시작...');
-    
-    // DOM 요소 가져오기
-    chatArea = document.getElementById('chatArea');
-    userInput = document.getElementById('userInput');
-    sendBtn = document.getElementById('sendBtn');
-    
-    // 요소 존재 확인
-    if (!chatArea || !userInput || !sendBtn) {
-        console.error('필수 DOM 요소를 찾을 수 없습니다:', {
-            chatArea: !!chatArea,
-            userInput: !!userInput,
-            sendBtn: !!sendBtn
+// 전역 변수
+let currentQuiz = null;
+let quizScore = 0;
+let totalQuestions = 0;
+
+// GPT API 호출 함수 (필요시 사용)
+async function fetchGPTResponse(prompt) {
+    try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: "gpt-3.5-turbo",
+                messages: [{ 
+                    role: "user", 
+                    content: prompt 
+                }],
+                temperature: 0.7
+            })
         });
-        return;
-    }
-    
-    console.log('DOM 요소 로드 완료');
-    
-    // 이벤트 리스너 등록
-    sendBtn.addEventListener('click', handleSendMessage);
-    userInput.addEventListener('keypress', handleKeyPress);
-    
-    // 초기 메시지 표시
-    showInitialMessage();
-    
-    console.log('챗봇 초기화 완료!');
-}
-
-// 초기 메시지 표시
-function showInitialMessage() {
-    const initialMessage = `
-        안녕하세요! 👋<br>
-        C언어와 Python 함수 관련 영어 단어를 학습할 수 있는 챗봇입니다.<br><br>
-        <strong>📚 학습할 수 있는 내용:</strong><br>
-        • 함수 관련 영어 단어와 뜻<br>
-        • 단어 퀴즈<br>
-        • 프로그래밍 예제<br>
-        • 단어 검색<br><br>
-        아래 버튼을 클릭하거나 직접 메시지를 입력해보세요!
         
-        <div class="menu-buttons">
-            <div class="menu-btn" data-action="quiz">📝 퀴즈 시작</div>
-            <div class="menu-btn" data-action="wordlist">📖 단어 목록</div>
-            <div class="menu-btn" data-action="random">🎲 랜덤 단어</div>
-            <div class="menu-btn" data-action="help">❓ 도움말</div>
-        </div>
-    `;
-    
-    addMessage(initialMessage, false);
-    
-    // 메뉴 버튼 이벤트 리스너 추가
-    addMenuButtonListeners();
-}
-
-// 메뉴 버튼 이벤트 리스너 추가
-function addMenuButtonListeners() {
-    // 이벤트 위임 사용
-    chatArea.addEventListener('click', function(event) {
-        if (event.target.classList.contains('menu-btn')) {
-            const action = event.target.getAttribute('data-action');
-            handleMenuAction(action);
-        }
-        
-        if (event.target.classList.contains('quiz-option')) {
-            const selectedAnswer = event.target.textContent;
-            const optionIndex = Array.from(event.target.parentNode.children).indexOf(event.target);
-            checkAnswer(selectedAnswer, optionIndex);
-        }
-    });
-}
-
-// 메뉴 액션 처리
-function handleMenuAction(action) {
-    switch(action) {
-        case 'quiz':
-            startQuiz();
-            break;
-        case 'wordlist':
-            showWordList();
-            break;
-        case 'random':
-            showRandomWord();
-            break;
-        case 'help':
-            showHelp();
-            break;
-        case 'score':
-            showScore();
-            break;
-        case 'nextquiz':
-            startQuiz();
-            break;
-        default:
-            console.log('알 수 없는 액션:', action);
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (error) {
+        console.error('API 호출 에러:', error);
+        return "죄송합니다. 현재 서비스에 문제가 있습니다.";
     }
 }
 
 // 메시지 추가 함수
 function addMessage(content, isUser = false) {
-    if (!chatArea) {
-        console.error('chatArea 요소가 없습니다');
-        return;
-    }
-    
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message';
     messageDiv.innerHTML = `<div class="${isUser ? 'user-message' : 'bot-message'}">${content}</div>`;
@@ -248,26 +175,8 @@ function addMessage(content, isUser = false) {
     chatArea.scrollTop = chatArea.scrollHeight;
 }
 
-// 메시지 전송 처리
-function handleSendMessage() {
-    const prompt = userInput.value.trim();
-    if (!prompt) return;
-    
-    addMessage(`나: ${prompt}`, true);
-    userInput.value = '';
-    
-    processMessage(prompt);
-}
-
-// 키 입력 처리
-function handleKeyPress(event) {
-    if (event.key === 'Enter') {
-        handleSendMessage();
-    }
-}
-
-// 메시지 처리
-function processMessage(prompt) {
+// 메시지 처리 함수
+async function processMessage(prompt) {
     const lowerPrompt = prompt.toLowerCase();
     
     if (lowerPrompt.includes('퀴즈') || lowerPrompt.includes('quiz')) {
@@ -275,7 +184,7 @@ function processMessage(prompt) {
     } else if (lowerPrompt.includes('단어') && lowerPrompt.includes('목록')) {
         showWordList();
     } else if (lowerPrompt.includes('랜덤') || lowerPrompt.includes('random')) {
-        showRandomWord();
+        randomWord();
     } else if (lowerPrompt.includes('도움') || lowerPrompt.includes('help')) {
         showHelp();
     } else if (lowerPrompt.includes('c언어') || lowerPrompt.includes('c language')) {
@@ -285,16 +194,17 @@ function processMessage(prompt) {
     } else if (lowerPrompt.includes('점수')) {
         showScore();
     } else {
-        // 단어 검색
+        // 단어 검색 먼저 시도
         const searchResult = searchWord(prompt);
         if (!searchResult) {
+            // 검색 결과가 없으면 기본 응답
             const reply = getBotResponse(prompt);
-            addMessage(`봇: ${reply}`);
+            addMessage(`GPT: ${reply}`);
         }
     }
 }
 
-// 기본 봇 응답
+// 기본 봇 응답 함수
 function getBotResponse(prompt) {
     const responses = [
         "함수 관련 영어 단어를 학습하고 싶으시면 '퀴즈'나 '단어 목록'을 입력해보세요!",
@@ -307,26 +217,26 @@ function getBotResponse(prompt) {
     return responses[Math.floor(Math.random() * responses.length)];
 }
 
-// 퀴즈 시작
+// 퀴즈 시작 함수
 function startQuiz() {
     const allWords = [...vocabularyData.c, ...vocabularyData.python];
-    const randomWordObj = allWords[Math.floor(Math.random() * allWords.length)];
-    const options = generateQuizOptions(randomWordObj);
+    const randomWord = allWords[Math.floor(Math.random() * allWords.length)];
+    const options = generateQuizOptions(randomWord);
     
     currentQuiz = {
-        word: randomWordObj,
-        correctAnswer: randomWordObj.meaning
+        word: randomWord,
+        correctAnswer: randomWord.meaning
     };
 
     let quizHTML = `
         <div class="word-card">
             <h3>📝 퀴즈 타임!</h3>
-            <p><strong>"${randomWordObj.word}"</strong>의 뜻은 무엇일까요?</p>
+            <p><strong>"${randomWord.word}"</strong>의 뜻은 무엇일까요?</p>
             <div class="quiz-options">
     `;
 
     options.forEach((option, index) => {
-        quizHTML += `<div class="quiz-option" data-answer="${option}">${option}</div>`;
+        quizHTML += `<div class="quiz-option" onclick="checkAnswer('${option}', ${index})">${option}</div>`;
     });
 
     quizHTML += `</div></div>`;
@@ -334,7 +244,7 @@ function startQuiz() {
     addMessage(quizHTML);
 }
 
-// 퀴즈 선택지 생성
+// 퀴즈 선택지 생성 함수
 function generateQuizOptions(correctWord) {
     const allWords = [...vocabularyData.c, ...vocabularyData.python];
     const options = [correctWord.meaning];
@@ -349,7 +259,7 @@ function generateQuizOptions(correctWord) {
     return options.sort(() => Math.random() - 0.5);
 }
 
-// 답변 확인
+// 답변 확인 함수
 function checkAnswer(selectedAnswer, optionIndex) {
     totalQuestions++;
     const options = document.querySelectorAll('.quiz-option');
@@ -369,11 +279,11 @@ function checkAnswer(selectedAnswer, optionIndex) {
     }
 
     setTimeout(() => {
-        addMessage(`<div class="menu-buttons"><div class="menu-btn" data-action="nextquiz">🔄 다음 퀴즈</div><div class="menu-btn" data-action="score">📊 점수 확인</div></div>`);
+        addMessage(`<div class="menu-buttons"><div class="menu-btn" onclick="startQuiz()">🔄 다음 퀴즈</div><div class="menu-btn" onclick="showScore()">📊 점수 확인</div></div>`);
     }, 1000);
 }
 
-// 점수 표시
+// 점수 표시 함수
 function showScore() {
     const percentage = totalQuestions > 0 ? Math.round((quizScore / totalQuestions) * 100) : 0;
     let message = `📊 <strong>현재 점수</strong><br>정답: ${quizScore}/${totalQuestions} (${percentage}%)`;
@@ -391,7 +301,7 @@ function showScore() {
     addMessage(message);
 }
 
-// 단어 목록 표시
+// 단어 목록 표시 함수
 function showWordList() {
     let message = "<h3>📖 함수 관련 영어 단어 목록</h3><br>";
     message += "<strong>🔵 C언어 함수 관련 단어:</strong><br>";
@@ -407,24 +317,24 @@ function showWordList() {
     addMessage(message);
 }
 
-// 랜덤 단어 표시
-function showRandomWord() {
+// 랜덤 단어 표시 함수
+function randomWord() {
     const allWords = [...vocabularyData.c, ...vocabularyData.python];
-    const randomWordObj = allWords[Math.floor(Math.random() * allWords.length)];
+    const randomWord = allWords[Math.floor(Math.random() * allWords.length)];
     
     const wordHTML = `
         <div class="word-card">
             <h3>🎲 오늘의 단어</h3>
-            <p><strong>${randomWordObj.word}</strong> - ${randomWordObj.meaning}</p>
-            <p>💡 ${randomWordObj.korean}</p>
-            <p>📝 예제: <code>${randomWordObj.example}</code></p>
+            <p><strong>${randomWord.word}</strong> - ${randomWord.meaning}</p>
+            <p>💡 ${randomWord.korean}</p>
+            <p>📝 예제: <code>${randomWord.example}</code></p>
         </div>
     `;
     
     addMessage(wordHTML);
 }
 
-// 언어별 단어 표시
+// 언어별 단어 표시 함수
 function showLanguageWords(language) {
     const words = vocabularyData[language];
     const langName = language === 'c' ? 'C언어' : 'Python';
@@ -441,7 +351,7 @@ function showLanguageWords(language) {
     addMessage(message);
 }
 
-// 단어 검색
+// 단어 검색 함수
 function searchWord(searchTerm) {
     const allWords = [...vocabularyData.c, ...vocabularyData.python];
     const found = allWords.find(word => 
@@ -462,12 +372,12 @@ function searchWord(searchTerm) {
         addMessage(wordHTML);
         return true;
     } else {
-        addMessage(`"${searchTerm}"에 대한 단어를 찾을 수 없습니다. 😅<br>다른 단어를 검색해보시거나 아래 버튼을 이용해보세요!<br><br><div class="menu-buttons"><div class="menu-btn" data-action="wordlist">📖 전체 단어보기</div><div class="menu-btn" data-action="random">🎲 랜덤 단어</div></div>`);
+        addMessage(`"${searchTerm}"에 대한 단어를 찾을 수 없습니다. 😅<br>다른 단어를 검색해보시거나 아래 버튼을 이용해보세요!<br><br><div class="menu-buttons"><div class="menu-btn" onclick="showWordList()">📖 전체 단어보기</div><div class="menu-btn" onclick="randomWord()">🎲 랜덤 단어</div></div>`);
         return false;
     }
 }
 
-// 도움말 표시
+// 도움말 표시 함수
 function showHelp() {
     const helpMessage = `
         <h3>❓ 도움말</h3><br>
@@ -491,9 +401,35 @@ function showHelp() {
     addMessage(helpMessage);
 }
 
-// DOM 로드 완료 후 초기화
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeChatbot);
-} else {
-    initializeChatbot();
+// 엔터키 처리 함수
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
 }
+
+// 메시지 전송 함수
+async function sendMessage() {
+    const prompt = userInput.value.trim();
+    if (!prompt) return;
+    
+    // 사용자 메시지 표시
+    addMessage(`나: ${prompt}`, true);
+    userInput.value = '';
+    
+    // 봇 응답 처리
+    await processMessage(prompt);
+}
+
+// 이벤트 리스너 등록
+sendBtn.addEventListener('click', async () => {
+    await sendMessage();
+});
+
+// 엔터키 이벤트 리스너
+userInput.addEventListener('keypress', handleKeyPress);
+
+// 페이지 로드 시 초기화
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('함수 영어단어 학습 챗봇이 준비되었습니다!');
+});
