@@ -228,10 +228,20 @@
             background: #a8a8a8;
         }
 
-        /* 로딩 상태 표시 */
+        /* 로딩 애니메이션 */
         .loading {
-            opacity: 0.6;
-            pointer-events: none;
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -243,16 +253,34 @@
         </div>
         
         <div id="chatArea">
-            <!-- 초기 메시지는 JavaScript에서 동적으로 추가 -->
+            <div class="message">
+                <div class="bot-message">
+                    안녕하세요! 👋<br>
+                    C언어와 Python 함수 관련 영어 단어를 학습할 수 있는 챗봇입니다.<br><br>
+                    <strong>📚 학습할 수 있는 내용:</strong><br>
+                    • 함수 관련 영어 단어와 뜻<br>
+                    • 단어 퀴즈<br>
+                    • 프로그래밍 예제<br>
+                    • 단어 검색<br><br>
+                    아래 버튼을 클릭하거나 직접 메시지를 입력해보세요!
+                    
+                    <div class="menu-buttons">
+                        <div class="menu-btn" onclick="startQuiz()">📝 퀴즈 시작</div>
+                        <div class="menu-btn" onclick="showWordList()">📖 단어 목록</div>
+                        <div class="menu-btn" onclick="randomWord()">🎲 랜덤 단어</div>
+                        <div class="menu-btn" onclick="showHelp()">❓ 도움말</div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="input-area">
             <input type="text" id="userInput" placeholder="메시지를 입력하세요...">
-            <button class="send-btn" id="sendBtn">전송</button>
+            <button class="send-btn">전송</button>
         </div>
     </div>
 
-    <!-- JavaScript 파일을 body 맨 끝에서 로드 -->
-    <script defer src="./main.js"></script>
+    <!-- JavaScript 파일 연결 -->
+    <script src="main.js"></script>
 </body>
 </html>
